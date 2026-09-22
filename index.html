@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>NexusFlow Engine</title>
+    <meta name="description" content="Token-agnostic order-matching core. Paper trading. Not a licensed exchange." />
+    <style>
+      :root { color-scheme: dark; }
+      body { margin:0; font: 15px/1.5 ui-sans-serif, system-ui, sans-serif; background:#07080a; color:#e8e6df; }
+      main { max-width: 720px; margin: 0 auto; padding: 48px 24px 80px; }
+      h1 { font-size: 28px; letter-spacing: -0.03em; font-weight: 600; margin: 0 0 8px; }
+      .k { font-size: 11px; letter-spacing: 0.18em; text-transform: uppercase; color: #8a8680; }
+      p, li { color: #c4c0b6; }
+      a { color: #d8d4c8; }
+      .box { border: 1px solid #2a2c30; padding: 16px 18px; margin: 20px 0; }
+      code { font-family: ui-monospace, monospace; font-size: 12px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="k">NexusFlow Engine</div>
+      <h1>Deterministic matching. Paper books only.</h1>
+      <p>
+        Token-agnostic order-matching core: AVL price tree, FIFO levels, O(1) order-id cancel,
+        single-writer sequencer, double-entry settlement. A future asset is another instrument row.
+        This software is not legal authorization to operate a real-money exchange.
+      </p>
+      <div class="box">
+        <div class="k">Runtime split</div>
+        <p>Matching actor belongs on a long-lived Node worker (Render). This Vercel surface is documentation only. Stateful book mutation is not hosted in a serverless isolate.</p>
+      </div>
+      <ul>
+        <li>Source: <a href="https://github.com/dominiccalandro1991-byte/NEXUSFLOW-ENGINE">github.com/dominiccalandro1991-byte/NEXUSFLOW-ENGINE</a></li>
+        <li>CI: GitHub Actions workflow <code>verify</code></li>
+        <li>Tests: <code>node --experimental-strip-types --test tests/*.test.ts</code></li>
+      </ul>
+    </main>
+  </body>
+</html>
