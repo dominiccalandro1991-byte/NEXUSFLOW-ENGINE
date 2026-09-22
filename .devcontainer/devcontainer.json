@@ -1,0 +1,8 @@
+{
+  "name": "NEXUSFLOW-ENGINE",
+  "image": "mcr.microsoft.com/devcontainers/javascript-node:22",
+  "postCreateCommand": "node --version && npm test",
+  "customizations": {
+    "vscode": { "extensions": ["dbaeumer.vscode-eslint"] }
+  }
+}
