@@ -1,0 +1,9 @@
+services:
+  - type: worker
+    name: nexusflow-matching-core
+    runtime: docker
+    plan: starter
+    dockerfilePath: ./Dockerfile
+    envVars:
+      - key: DATABASE_URL
+        sync: false

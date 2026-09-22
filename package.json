@@ -1,0 +1,10 @@
+{
+  "name": "nexusflow-engine",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --experimental-strip-types --test tests/*.test.ts",
+    "bench": "node --experimental-strip-types src/bench.ts",
+    "typecheck": "tsc --noEmit"
+  }
+}
