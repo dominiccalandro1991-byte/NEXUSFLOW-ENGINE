@@ -1,7 +1,13 @@
 FROM node:22-slim
 WORKDIR /app
-COPY package.json tsconfig.json ./
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev
+COPY tsconfig.json ./
 COPY src ./src
-COPY tests ./tests
-COPY database ./database
-CMD ["node", "--experimental-strip-types", "src/bench.ts"]
+COPY supabase ./supabase
+RUN chown -R node:node /app
+USER node
+ENV NODE_ENV=production
+ENV PORT=8080
+EXPOSE 8080
+CMD ["node", "--experimental-strip-types", "src/main.ts"]

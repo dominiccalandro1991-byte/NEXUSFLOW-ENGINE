@@ -77,6 +77,7 @@ export class MatchingEngine {
   private readonly orders = new Map<string, OrderNode>();
   private readonly openByAccount = new Map<string, number>();
   private seq = 0;
+  private lastRestoreSeq = 0;
   private writerLocked = false;
   private readonly listeners = new Set<(e: EngineEvent) => void>();
 
@@ -141,6 +142,57 @@ export class MatchingEngine {
 
   resting(): RestingOrder[] {
     return [...this.orders.values()].map((n) => ({ ...n.order }));
+  }
+
+  /**
+   * Resting orders in book walk order: bids high-to-low, asks low-to-high,
+   * and FIFO (head to tail) inside each price level. Recovery validation uses this.
+   * It does not mutate the book and does not match.
+   */
+  restingInMatchOrder(): RestingOrder[] {
+    const out: RestingOrder[] = [];
+    const walk = (tree: AvlPriceTree<PriceLevel>, desc: boolean) => {
+      const levels = desc ? tree.collectDesc(tree.size) : tree.collectAsc(tree.size);
+      for (const level of levels) {
+        let node = level.value.head;
+        while (node) {
+          out.push({ ...node.order });
+          node = node.next;
+        }
+      }
+    };
+    walk(this.bids, true);
+    walk(this.asks, false);
+    return out;
+  }
+
+  /**
+   * Recovery-only insertion. Restores one previously accepted resting order
+   * without crossing or emitting trades. Call in strictly increasing `seq` order
+   * so price-level FIFO matches the durable sequence.
+   */
+  restoreResting(snapshot: RestingOrder): void {
+    this.mutate(() => this.restoreRestingLocked(snapshot));
+  }
+
+  /**
+   * Moves the book sequence up to a durable high-water mark. Never matches.
+   * Refuses to move backwards.
+   */
+  restoreSequence(seq: number): void {
+    this.mutate(() => {
+      if (!Number.isInteger(seq) || seq < 0) {
+        throw new EngineError("INVALID_SEQUENCE", "Sequence must be a non-negative integer");
+      }
+      if (seq < this.seq) {
+        throw new EngineError(
+          "SEQUENCE_REGRESSION",
+          "Refusing to move the book sequence backwards",
+          { current: this.seq, requested: seq },
+        );
+      }
+      this.seq = seq;
+    });
   }
 
   private mutate<T>(fn: () => T): T {
@@ -331,6 +383,75 @@ export class MatchingEngine {
     this.emit("order_cancelled", { ...node.order }, seq);
     this.emit("book", this.snapshot(), seq);
     return { ...node.order };
+  }
+
+  private restoreRestingLocked(snapshot: RestingOrder): void {
+    if (snapshot.instrumentId !== this.instrumentId) {
+      throw new EngineError("INSTRUMENT_MISMATCH", "Wrong book", {
+        instrumentId: snapshot.instrumentId,
+      });
+    }
+    if (this.orders.has(snapshot.id)) {
+      throw new EngineError("DUPLICATE_ORDER", "Order id already exists", {
+        orderId: snapshot.id,
+      });
+    }
+    if (snapshot.status !== "open" && snapshot.status !== "partially_filled") {
+      throw new EngineError("NOT_RESTING", "Only open or partially filled orders can be restored");
+    }
+    if (
+      !Number.isInteger(snapshot.quantity) ||
+      snapshot.quantity < NEXUS_LIMITS.MIN_QUANTITY ||
+      !Number.isInteger(snapshot.remaining) ||
+      snapshot.remaining <= 0 ||
+      snapshot.remaining > snapshot.quantity
+    ) {
+      throw new EngineError("INVALID_QUANTITY", "Resting remainder is invalid");
+    }
+    if (
+      !Number.isInteger(snapshot.priceTicks) ||
+      snapshot.priceTicks < NEXUS_LIMITS.MIN_PRICE_TICKS
+    ) {
+      throw new EngineError("INVALID_PRICE", "Resting orders require a positive tick price");
+    }
+    if (!Number.isInteger(snapshot.seq) || snapshot.seq <= 0) {
+      throw new EngineError("INVALID_SEQUENCE", "Resting order sequence is invalid");
+    }
+    if (snapshot.seq <= this.lastRestoreSeq) {
+      throw new EngineError(
+        "OUT_OF_ORDER_RECOVERY",
+        "Recovery must insert resting orders in increasing sequence order",
+        { orderId: snapshot.id, seq: snapshot.seq, lastRestoreSeq: this.lastRestoreSeq },
+      );
+    }
+    if (snapshot.side !== "buy" && snapshot.side !== "sell") {
+      throw new EngineError("INVALID_SIDE", "Resting side is invalid");
+    }
+    const order: RestingOrder = {
+      id: snapshot.id,
+      accountId: snapshot.accountId,
+      instrumentId: snapshot.instrumentId,
+      side: snapshot.side,
+      type: snapshot.type,
+      priceTicks: snapshot.priceTicks,
+      quantity: snapshot.quantity,
+      remaining: snapshot.remaining,
+      seq: snapshot.seq,
+      status: snapshot.status,
+      ts: snapshot.ts,
+    };
+    const tree = order.side === "buy" ? this.bids : this.asks;
+    let level = tree.get(order.priceTicks);
+    if (!level) {
+      level = new PriceLevel(order.priceTicks);
+      tree.insert(order.priceTicks, level);
+    }
+    const node = new OrderNode(order);
+    level.enqueue(node);
+    this.orders.set(order.id, node);
+    this.incOpen(order.accountId);
+    this.lastRestoreSeq = order.seq;
+    if (order.seq > this.seq) this.seq = order.seq;
   }
 
   private incOpen(accountId: string): void {

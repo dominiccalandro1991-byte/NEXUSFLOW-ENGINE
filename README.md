@@ -22,11 +22,13 @@ It is **not** a legal authorization to operate a real-money exchange.
 ## Run
 
 ```bash
-node --experimental-strip-types --test tests/*.test.ts
-node --experimental-strip-types src/bench.ts
+npm test
+npm run test:integration   # needs DATABASE_URL and local PostgreSQL
+npm run bench              # in-memory benchmark only
+npm start                  # persistent matcher; requires env from .env.example
 ```
 
-Node 22 required.
+Node 22 required. The benchmark is not the production entrypoint.
 
 ## Measured (this sandbox, 2026-09-22)
 
@@ -37,4 +39,4 @@ Node 22 required.
 | 200 cancellations | 1.18 ms |
 | Market match 400 lots | 0.64 ms |
 
-These are measurements, not latency SLAs.
+These are measurements, not latency SLAs. Re-run `npm run bench` for a fresh local number.

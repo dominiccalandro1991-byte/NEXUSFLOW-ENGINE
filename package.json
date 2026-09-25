@@ -4,7 +4,18 @@
   "type": "module",
   "scripts": {
     "test": "node --experimental-strip-types --test tests/*.test.ts",
+    "test:integration": "node --experimental-strip-types --test --test-concurrency=1 tests/integration/*.test.ts",
+    "test:all": "node --experimental-strip-types --test --test-concurrency=1 tests/*.test.ts tests/integration/*.test.ts",
     "bench": "node --experimental-strip-types src/bench.ts",
+    "start": "node --experimental-strip-types src/main.ts",
+    "migrate": "node --experimental-strip-types src/db/migrate.ts",
     "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "pg": "^8.16.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.17.2",
+    "@types/pg": "^8.15.5"
   }
 }

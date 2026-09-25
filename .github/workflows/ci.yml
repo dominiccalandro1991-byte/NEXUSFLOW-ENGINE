@@ -6,12 +6,40 @@ on:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: nexusflow_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d nexusflow_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgres://postgres:postgres@127.0.0.1:5432/nexusflow_test
+      DATABASE_SSL: disable
+      NEXUSFLOW_JWT_SECRET: test-jwt-secret-not-production
+      NEXUSFLOW_AUTH_MODE: hmac
+      JWT_ISSUER: nexusflow-test
+      JWT_AUDIENCE: authenticated
+      AUTO_MIGRATE: "true"
+      LOG_LEVEL: error
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+          cache: npm
+      - run: npm ci
       - name: require test files
         run: test -n "$(ls tests/*.test.ts)"
-      - run: node --experimental-strip-types --test tests/*.test.ts
-      - run: node --experimental-strip-types src/bench.ts
+      - run: npm test
+      - run: npm run typecheck
+      - run: npm run test:integration
+      - run: npm run bench
